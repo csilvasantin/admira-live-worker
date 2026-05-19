@@ -1,6 +1,6 @@
 name = "admira-live-worker"
 main = "src/index.js"
-compatibility_date = "2026-05-01"
+compatibility_date = "2025-07-18"
 compatibility_flags = ["nodejs_compat"]
 
 # Secrets (set con `wrangler secret put`):

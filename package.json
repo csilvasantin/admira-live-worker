@@ -13,6 +13,6 @@
     "secret:password": "wrangler secret put YARIG_PASSWORD"
   },
   "devDependencies": {
-    "wrangler": "^3.99.0"
+    "wrangler": "^4.93.0"
   }
 }
