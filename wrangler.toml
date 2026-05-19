@@ -1,0 +1,17 @@
+name = "admira-live-worker"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Secrets (set con `wrangler secret put`):
+#   YARIG_EMAIL
+#   YARIG_PASSWORD
+
+# Logs en tiempo real con `npm run tail`.
+[observability]
+enabled = true
+
+# Si se monta el dominio api.admira.live en Cloudflare, descomentar:
+# [[routes]]
+# pattern = "api.admira.live/*"
+# zone_name = "admira.live"

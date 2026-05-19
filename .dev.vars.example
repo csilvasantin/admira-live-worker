@@ -1,0 +1,5 @@
+# Copia este fichero a .dev.vars (ignorado por git) para desarrollo local con `wrangler dev`.
+# En producción, usar `wrangler secret put YARIG_EMAIL` y `wrangler secret put YARIG_PASSWORD`.
+
+YARIG_EMAIL=admira-live-bot@example.com
+YARIG_PASSWORD=changeme

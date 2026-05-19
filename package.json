@@ -1,0 +1,18 @@
+{
+  "name": "admira-live-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker — bridge entre admira.live (público) y yarig.ai (auth con email+password). Service account fijo + micro-cache 10s.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "secret:email": "wrangler secret put YARIG_EMAIL",
+    "secret:password": "wrangler secret put YARIG_PASSWORD"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
+  }
+}
