@@ -11,6 +11,14 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
+# Capa de sync: snapshot de Yarig en KV, refrescado por Cron cada 5 min.
+[[kv_namespaces]]
+binding = "YARIG_CACHE"
+id = "d1201968f692425bb4e94474bb73aba8"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
 # Si se monta el dominio api.admira.live en Cloudflare, descomentar:
 # [[routes]]
 # pattern = "api.admira.live/*"

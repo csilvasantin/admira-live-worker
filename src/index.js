@@ -17,6 +17,10 @@ const ALLOWED_ORIGINS = new Set([
   "https://admira.live",
   "https://www.admira.live",
   "https://csilvasantin.github.io",
+  "https://www.yokup.com",
+  "https://yokup.com",
+  "https://www.carlossilva.info",
+  "https://carlossilva.info",
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:8814",
@@ -202,6 +206,7 @@ const ROUTES = {
   "/api/score/total": (req, env) => handleProxy(req, env, ENDPOINTS.score),
   "/api/wall": (req, env) => handleProxy(req, env, ENDPOINTS.notifications),
   "/api/company/tasks": (req, env) => handleProxy(req, env, ENDPOINTS.companyTasks, { id: 0 }),
+  "/api/snapshot": handleSnapshot,
 };
 
 export default {
@@ -257,11 +262,64 @@ export default {
       return json({ error: "upstream_failed", message: String(err?.message || err) }, 502, request);
     }
   },
+
+  // Cron (cada 5 min): refresca el snapshot de Yarig en KV.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(refreshSnapshot(env).catch((e) => console.log("snapshot cron error:", String(e?.message || e))));
+  },
 };
 
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Capa de sync: snapshot de Yarig en KV (refrescado por Cron) para que Yokup
+// lea rápido y resiliente sin machacar la service account en cada visita.
+// ---------------------------------------------------------------------------
+const SNAPSHOT_KEY = "snapshot:latest";
+const SNAPSHOT_TTL_MS = 5 * 60 * 1000;
+
+async function buildSnapshot(env) {
+  const client = getClient(env);
+  const [team, company, score] = await Promise.all([
+    client.requestJson(ENDPOINTS.ranking, { method: "POST", form: { column: "points", order: "desc", rank: "points", range: "" } }).catch(() => null),
+    client.requestJson(ENDPOINTS.companyTasks, { method: "POST", form: { id: 0 } }).catch(() => null),
+    client.requestJson(ENDPOINTS.score, { method: "POST" }).catch(() => null),
+  ]);
+  const tasks = (company && Array.isArray(company.tasks)) ? company.tasks : [];
+  return {
+    fetchedAt: Date.now(),
+    team: Array.isArray(team) ? team : [],
+    teamCount: Array.isArray(team) ? team.length : 0,
+    tasks,
+    taskCount: tasks.length,
+    clockings: (company && Array.isArray(company.clockings)) ? company.clockings : [],
+    score: (score === undefined ? null : score),
+  };
+}
+
+async function refreshSnapshot(env) {
+  const snap = await buildSnapshot(env);
+  if (env.YARIG_CACHE) await env.YARIG_CACHE.put(SNAPSHOT_KEY, JSON.stringify(snap));
+  return snap;
+}
+
+async function handleSnapshot(request, env) {
+  const url = new URL(request.url);
+  let snap = null;
+  if (env.YARIG_CACHE) {
+    const raw = await env.YARIG_CACHE.get(SNAPSHOT_KEY);
+    if (raw) { try { snap = JSON.parse(raw); } catch (e) {} }
+  }
+  const stale = !snap || (Date.now() - (snap.fetchedAt || 0) > SNAPSHOT_TTL_MS);
+  if (stale || url.searchParams.get("refresh")) {
+    try { snap = await refreshSnapshot(env); } catch (e) {
+      if (!snap) return json({ ok: false, error: "snapshot_unavailable", message: String(e?.message || e) }, 502, request);
+    }
+  }
+  return json({ ok: true, cached: !(stale || url.searchParams.get("refresh")), ...snap }, 200, request);
+}
 
 async function handleHealth(request, env) {
   const client = getClient(env);
