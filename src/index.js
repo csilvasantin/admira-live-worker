@@ -312,7 +312,12 @@ async function handleWrite(path, request, env) {
     return json({ ok: true, action: finished ? "finish" : "pause", id, data }, 200, request);
   }
   if (path === "/api/task/add") {
-    const desc = String(body.description || "").trim().slice(0, 300);
+    // Saneo: Yarig json_add_tasks usa delimitadores #$# y @$@ y no digiere emoji/no-BMP
+    // (la descripción se perdía). Protegemos delimitadores y quitamos caracteres fuera del BMP.
+    const desc = String(body.description || "")
+      .replace(/#\$#/g, "# #").replace(/@\$@/g, "@ @")
+      .replace(/[\u{10000}-\u{10FFFF}]/gu, "")
+      .trim().slice(0, 300);
     if (!desc) return json({ error: "missing_description" }, 400, request);
     const est = Number(body.estimation) || 1;
     const pid = Number(body.project_id) || 312;
