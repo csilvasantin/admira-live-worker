@@ -213,6 +213,18 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
 
+    // Endpoints de ESCRITURA en Yarig real (start/finish/pause/add) — requieren X-Write-Key.
+    if (url.pathname.startsWith("/api/task/")) {
+      if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, request);
+      if (env.WRITE_KEY && request.headers.get("X-Write-Key") !== env.WRITE_KEY)
+        return json({ error: "unauthorized" }, 401, request);
+      try {
+        return withCors(await handleWrite(url.pathname, request, env), request);
+      } catch (err) {
+        return json({ error: "write_failed", message: String(err?.message || err) }, 502, request);
+      }
+    }
+
     const handler = ROUTES[url.pathname];
     if (!handler) {
       return json({ error: "not_found", path: url.pathname }, 404, request);
@@ -263,6 +275,38 @@ async function handleHealth(request, env) {
   );
 }
 
+// Escritura en Yarig real. Acciones portadas de 02.-YarigTelegram/src/yarig.py:
+//   start  → /tasks/json_get_and_open_task {id}
+//   finish → /tasks/json_close_task {tid, finished:1}
+//   pause  → /tasks/json_close_task {tid, finished:0}
+//   add    → /tasks/json_add_tasks {tasks:"tmpid#$#est#$#desc#$#project@$@"}
+async function handleWrite(path, request, env) {
+  const client = getClient(env);
+  let body = {};
+  try { body = await request.json(); } catch (e) {}
+  if (path === "/api/task/start") {
+    const id = String(body.id || ""); if (!id) return json({ error: "missing_id" }, 400, request);
+    const data = await client.requestJson("/tasks/json_get_and_open_task", { method: "POST", form: { id } });
+    return json({ ok: true, action: "start", id, data }, 200, request);
+  }
+  if (path === "/api/task/finish" || path === "/api/task/pause") {
+    const id = String(body.id || ""); if (!id) return json({ error: "missing_id" }, 400, request);
+    const finished = path === "/api/task/finish" ? 1 : 0;
+    const data = await client.requestJson("/tasks/json_close_task", { method: "POST", form: { tid: id, finished } });
+    return json({ ok: true, action: finished ? "finish" : "pause", id, data }, 200, request);
+  }
+  if (path === "/api/task/add") {
+    const desc = String(body.description || "").trim().slice(0, 300);
+    if (!desc) return json({ error: "missing_description" }, 400, request);
+    const est = Number(body.estimation) || 1;
+    const pid = Number(body.project_id) || 312;
+    const tasks = `${Date.now()}#$#${est}#$#${desc}#$#${pid}@$@`;
+    const data = await client.requestJson("/tasks/json_add_tasks", { method: "POST", form: { tasks } });
+    return json({ ok: true, action: "add", data }, 200, request);
+  }
+  return json({ error: "unknown_action", path }, 404, request);
+}
+
 async function handleProxy(request, env, yarigPath, form) {
   const client = getClient(env);
   const data = await client.requestJson(yarigPath, { method: "POST", form });
@@ -278,8 +322,8 @@ function corsHeaders(request) {
   const allowed = ALLOWED_ORIGINS.has(origin) ? origin : "https://admira.live";
   return {
     "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Write-Key",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
