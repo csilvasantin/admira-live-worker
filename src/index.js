@@ -16,8 +16,11 @@ const DASHBOARD_PATH = "/tasks";
 const ALLOWED_ORIGINS = new Set([
   "https://admira.live",
   "https://www.admira.live",
+  "https://csilvasantin.github.io",
   "http://localhost:8080",
   "http://localhost:5173",
+  "http://localhost:8814",
+  "http://localhost:8815",
   "http://127.0.0.1:8080",
 ]);
 
