@@ -311,6 +311,11 @@ async function handleWrite(path, request, env) {
     const data = await client.requestJson("/tasks/json_close_task", { method: "POST", form: { tid: id, finished } });
     return json({ ok: true, action: finished ? "finish" : "pause", id, data }, 200, request);
   }
+  if (path === "/api/task/delete") {
+    const id = String(body.id || ""); if (!id) return json({ error: "missing_id" }, 400, request);
+    const data = await client.requestJson("/tasks/json_delete_task", { method: "POST", form: { id } });
+    return json({ ok: true, action: "delete", id, data }, 200, request);
+  }
   if (path === "/api/task/add") {
     // Saneo: Yarig json_add_tasks usa delimitadores #$# y @$@ y no digiere emoji/no-BMP
     // (la descripción se perdía). Protegemos delimitadores y quitamos caracteres fuera del BMP.
