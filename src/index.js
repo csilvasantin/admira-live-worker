@@ -313,7 +313,7 @@ async function handleWrite(path, request, env) {
   }
   if (path === "/api/task/delete") {
     const id = String(body.id || ""); if (!id) return json({ error: "missing_id" }, 400, request);
-    const data = await client.requestJson("/tasks/json_delete_task", { method: "POST", form: { id } });
+    const data = await client.requestJson("/tasks/json_delete_task", { method: "POST", form: { id, tid: id, task: id, id_task: id } });
     return json({ ok: true, action: "delete", id, data }, 200, request);
   }
   if (path === "/api/task/add") {
