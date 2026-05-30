@@ -197,11 +197,11 @@ class YarigClient {
 
 const ROUTES = {
   "/api/health": handleHealth,
-  "/api/team/ranking": (req, env) => handleProxy(req, env, ENDPOINTS.ranking),
+  "/api/team/ranking": (req, env) => handleProxy(req, env, ENDPOINTS.ranking, { column: "points", order: "desc", rank: "points", range: "" }),
   "/api/tasks/today": (req, env) => handleProxy(req, env, ENDPOINTS.tasksToday),
   "/api/score/total": (req, env) => handleProxy(req, env, ENDPOINTS.score),
   "/api/wall": (req, env) => handleProxy(req, env, ENDPOINTS.notifications),
-  "/api/company/tasks": (req, env) => handleProxy(req, env, ENDPOINTS.companyTasks),
+  "/api/company/tasks": (req, env) => handleProxy(req, env, ENDPOINTS.companyTasks, { id: 0 }),
 };
 
 export default {
@@ -263,9 +263,9 @@ async function handleHealth(request, env) {
   );
 }
 
-async function handleProxy(request, env, yarigPath) {
+async function handleProxy(request, env, yarigPath, form) {
   const client = getClient(env);
-  const data = await client.requestJson(yarigPath, { method: "POST" });
+  const data = await client.requestJson(yarigPath, { method: "POST", form });
   return json({ ok: true, source: yarigPath, data, fetched_at: new Date().toISOString() }, 200, request);
 }
 
