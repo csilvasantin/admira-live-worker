@@ -213,11 +213,17 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
 
-    // Endpoints de ESCRITURA en Yarig real (start/finish/pause/add) — requieren X-Write-Key.
+    // Endpoints de ESCRITURA en Yarig real (start/finish/pause/add).
+    // Defensa en capas: (1) método POST, (2) Origin en allowlist (frena curl/no-navegador),
+    // (3) X-Write-Key, (4) rate-limit por IP. Aun así solo afecta a la cuenta service account.
     if (url.pathname.startsWith("/api/task/")) {
       if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, request);
+      const wOrigin = request.headers.get("Origin") || "";
+      if (!ALLOWED_ORIGINS.has(wOrigin)) return json({ error: "forbidden_origin" }, 403, request);
       if (env.WRITE_KEY && request.headers.get("X-Write-Key") !== env.WRITE_KEY)
         return json({ error: "unauthorized" }, 401, request);
+      const ip = request.headers.get("CF-Connecting-IP") || "anon";
+      if (!writeRateOk(ip)) return json({ error: "rate_limited" }, 429, request);
       try {
         return withCors(await handleWrite(url.pathname, request, env), request);
       } catch (err) {
@@ -280,6 +286,16 @@ async function handleHealth(request, env) {
 //   finish → /tasks/json_close_task {tid, finished:1}
 //   pause  → /tasks/json_close_task {tid, finished:0}
 //   add    → /tasks/json_add_tasks {tasks:"tmpid#$#est#$#desc#$#project@$@"}
+// Rate-limit de escrituras por IP (ventana deslizante en memoria del isolate).
+const _writeHits = new Map();
+function writeRateOk(ip, max = 20, windowMs = 60000) {
+  const now = Date.now();
+  const arr = (_writeHits.get(ip) || []).filter((t) => now - t < windowMs);
+  if (arr.length >= max) { _writeHits.set(ip, arr); return false; }
+  arr.push(now); _writeHits.set(ip, arr);
+  return true;
+}
+
 async function handleWrite(path, request, env) {
   const client = getClient(env);
   let body = {};
